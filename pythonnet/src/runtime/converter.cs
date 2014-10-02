@@ -404,6 +404,26 @@ namespace Python.Runtime {
                 return true;
 
             case TypeCode.Int32:
+#if (PYTHON32 || PYTHON33 || PYTHON34)
+                // Python3 uses only 64 bits integers as ints
+                op = Runtime.PyNumber_Long(value);
+                if (op == IntPtr.Zero) {
+                    if (Exceptions.ExceptionMatches(overflow)) {
+                        goto overflow;
+                    }
+                    goto type_error;
+                }
+                long ll = (long)Runtime.PyLong_AsLongLong(op);
+                Runtime.Decref(op);
+                if ((ll == -1) && Exceptions.ErrorOccurred()) {
+                    goto overflow;
+                }
+                if (ll > Int32.MaxValue || ll < Int32.MinValue) {
+                    goto overflow;
+                }
+                result = (int)ll;
+                return true;
+#else
                 // Trickery to support 64-bit platforms.
                 if (IntPtr.Size == 4) {
                     op = Runtime.PyNumber_Int(value);
@@ -444,7 +464,7 @@ namespace Python.Runtime {
                     result = (int)ll;
                     return true;
                 }
-
+#endif
             case TypeCode.Boolean:
                 result = (Runtime.PyObject_IsTrue(value) != 0);
                 return true;
